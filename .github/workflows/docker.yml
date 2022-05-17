@@ -1,0 +1,56 @@
+# Ctrl+F and replace all instaces of ORGANIZATION and WORKFLOW
+
+---
+name: "New Docker Image"
+
+on:
+  release:
+    types: ["published"]
+
+jobs:
+  build-push-gcr:
+    name: Build and Push to GCP
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_ID: ORGANIZATION
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Set Env
+      run: | 
+        echo '=====> Setting up environment variables'
+        release_tag=$(echo ${{ github.ref }} | awk -F '/' '{print $3}')
+        image_name=$(echo $release_tag | awk -F '-' '{print $1}')
+        image_version=$(echo $release_tag | awk -F $image_name- '{print $2}')
+        echo "RELEASE_TAG_VERSION=$(echo $image_version)" >> $GITHUB_ENV
+        echo "IMAGE_NAME=$(echo $image_name)" >> $GITHUB_ENV
+
+    - name: 'GCP Authentication'
+      uses: 'google-github-actions/auth@v0'
+      with:
+        credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v0'
+
+    - name: 'Use gcloud CLI'
+      run: 'gcloud info'
+
+    - name: Configure Docker Client
+      run: |
+        gcloud auth configure-docker --quiet
+        gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+    - name: Build Docker Image
+      run: |
+        cd docker/$IMAGE_NAME
+        docker build -t $IMAGE_NAME:latest .
+
+    - name: Push Docker Image to Artifact Registry    
+      run: |
+        docker tag $IMAGE_NAME:latest us-central1-docker.pkg.dev/$PROJECT_ID/ORGANIZATION-container-registry/$IMAGE_NAME:latest
+        docker tag $IMAGE_NAME:latest us-central1-docker.pkg.dev/$PROJECT_ID/ORGANIZATION-container-registry/$IMAGE_NAME:$RELEASE_TAG_VERSION
+        docker push us-central1-docker.pkg.dev/$PROJECT_ID/ORGANIZATION-container-registry/$IMAGE_NAME:latest
+        docker push us-central1-docker.pkg.dev/$PROJECT_ID/ORGANIZATION-container-registry/$IMAGE_NAME:$RELEASE_TAG_VERSION
+        
