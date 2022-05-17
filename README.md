@@ -1,3 +1,3 @@
-# Terraform Infra Repo Template
+# Docker Images Repo Template
 
-A template repository for Terraform Infra
+A template repository for Docker Images
